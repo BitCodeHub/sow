@@ -26,16 +26,22 @@ import {
   TrendingDown,
   Minus,
   Flag,
+  Type,
 } from "lucide-react";
-import type { ParsedSOW, AnalysisResult, Issue, Section } from "@/types";
+import type { ParsedSOW, AnalysisResult, Issue, Section, FormattingAnalysis } from "@/types";
 import { computeTextDiff, type DiffPart } from "@/utils/diffUtils";
+import FormattingPanel from "./FormattingPanel";
 
 interface ReviewDashboardProps {
   templateSow: ParsedSOW;
   draftSow: ParsedSOW;
   analysis: AnalysisResult;
+  formattingAnalysis?: FormattingAnalysis | null;
   editedSections: Record<string, string>;
   onEdit: (sectionId: string, content: string) => void;
+  onApplyFormatting?: (differenceId: string) => void;
+  onApplyAllFormatting?: () => void;
+  appliedFormatting?: Set<string>;
 }
 
 interface SectionMatch {
@@ -571,12 +577,17 @@ export default function ReviewDashboard({
   templateSow,
   draftSow,
   analysis,
+  formattingAnalysis,
   editedSections,
   onEdit,
+  onApplyFormatting,
+  onApplyAllFormatting,
+  appliedFormatting,
 }: ReviewDashboardProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [resolvedSections, setResolvedSections] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<"all" | "issues" | "resolved">("all");
+  const [activeTab, setActiveTab] = useState<"content" | "formatting">("content");
 
   // Match sections and organize data
   const sectionMatches = useMemo((): SectionMatch[] => {
@@ -727,85 +738,148 @@ export default function ReviewDashboard({
           />
         </div>
 
-        {/* Quick stats */}
-        <div className="flex gap-4">
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-4">
           <button
-            onClick={() => setFilter("all")}
-            className={`flex-1 p-3 rounded-lg border transition-colors ${
-              filter === "all"
-                ? "bg-[--bg-tertiary] border-[--accent-blue]"
-                : "border-[--border-color] hover:bg-[--bg-tertiary]"
+            onClick={() => setActiveTab("content")}
+            className={`flex-1 p-3 rounded-lg border transition-colors flex items-center justify-center gap-2 ${
+              activeTab === "content"
+                ? "bg-[--accent-blue]/10 border-[--accent-blue] text-[--accent-blue]"
+                : "border-[--border-color] hover:bg-[--bg-tertiary] text-[--text-secondary]"
             }`}
           >
-            <div className="text-2xl font-bold text-[--text-primary]">{stats.total}</div>
-            <div className="text-xs text-[--text-muted]">Total Sections</div>
+            <FileText className="w-4 h-4" />
+            <span className="font-medium">Content Analysis</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs ${
+              activeTab === "content" ? "bg-[--accent-blue]/20" : "bg-[--bg-tertiary]"
+            }`}>
+              {analysis.allIssues.length}
+            </span>
           </button>
 
           <button
-            onClick={() => setFilter("issues")}
-            className={`flex-1 p-3 rounded-lg border transition-colors ${
-              filter === "issues"
-                ? "bg-[--bg-tertiary] border-[--accent-yellow]"
-                : "border-[--border-color] hover:bg-[--bg-tertiary]"
+            onClick={() => setActiveTab("formatting")}
+            className={`flex-1 p-3 rounded-lg border transition-colors flex items-center justify-center gap-2 ${
+              activeTab === "formatting"
+                ? "bg-[--accent-purple]/10 border-[--accent-purple] text-[--accent-purple]"
+                : "border-[--border-color] hover:bg-[--bg-tertiary] text-[--text-secondary]"
             }`}
           >
-            <div className="text-2xl font-bold text-[--accent-yellow]">{stats.withIssues - stats.resolved}</div>
-            <div className="text-xs text-[--text-muted]">Need Review</div>
-          </button>
-
-          {stats.highPriority > 0 && (
-            <button
-              onClick={() => setFilter("issues")}
-              className="flex-1 p-3 rounded-lg border border-[--border-color] bg-[rgba(244,33,46,0.1)] hover:bg-[rgba(244,33,46,0.15)] transition-colors pulse-attention"
-            >
-              <div className="text-2xl font-bold text-[--accent-red]">{stats.highPriority}</div>
-              <div className="text-xs text-[--accent-red]">High Priority</div>
-            </button>
-          )}
-
-          <button
-            onClick={() => setFilter("resolved")}
-            className={`flex-1 p-3 rounded-lg border transition-colors ${
-              filter === "resolved"
-                ? "bg-[--bg-tertiary] border-[--accent-green]"
-                : "border-[--border-color] hover:bg-[--bg-tertiary]"
-            }`}
-          >
-            <div className="text-2xl font-bold text-[--accent-green]">{stats.resolved}</div>
-            <div className="text-xs text-[--text-muted]">Reviewed</div>
+            <Type className="w-4 h-4" />
+            <span className="font-medium">Formatting & Terminology</span>
+            {formattingAnalysis && (
+              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                activeTab === "formatting" ? "bg-[--accent-purple]/20" : "bg-[--bg-tertiary]"
+              }`}>
+                {formattingAnalysis.summary.totalFormattingIssues + formattingAnalysis.summary.undefinedAcronyms}
+              </span>
+            )}
           </button>
         </div>
+
+        {/* Quick stats - only show for content tab */}
+        {activeTab === "content" && (
+          <div className="flex gap-4">
+            <button
+              onClick={() => setFilter("all")}
+              className={`flex-1 p-3 rounded-lg border transition-colors ${
+                filter === "all"
+                  ? "bg-[--bg-tertiary] border-[--accent-blue]"
+                  : "border-[--border-color] hover:bg-[--bg-tertiary]"
+              }`}
+            >
+              <div className="text-2xl font-bold text-[--text-primary]">{stats.total}</div>
+              <div className="text-xs text-[--text-muted]">Total Sections</div>
+            </button>
+
+            <button
+              onClick={() => setFilter("issues")}
+              className={`flex-1 p-3 rounded-lg border transition-colors ${
+                filter === "issues"
+                  ? "bg-[--bg-tertiary] border-[--accent-yellow]"
+                  : "border-[--border-color] hover:bg-[--bg-tertiary]"
+              }`}
+            >
+              <div className="text-2xl font-bold text-[--accent-yellow]">{stats.withIssues - stats.resolved}</div>
+              <div className="text-xs text-[--text-muted]">Need Review</div>
+            </button>
+
+            {stats.highPriority > 0 && (
+              <button
+                onClick={() => setFilter("issues")}
+                className="flex-1 p-3 rounded-lg border border-[--border-color] bg-[rgba(244,33,46,0.1)] hover:bg-[rgba(244,33,46,0.15)] transition-colors pulse-attention"
+              >
+                <div className="text-2xl font-bold text-[--accent-red]">{stats.highPriority}</div>
+                <div className="text-xs text-[--accent-red]">High Priority</div>
+              </button>
+            )}
+
+            <button
+              onClick={() => setFilter("resolved")}
+              className={`flex-1 p-3 rounded-lg border transition-colors ${
+                filter === "resolved"
+                  ? "bg-[--bg-tertiary] border-[--accent-green]"
+                  : "border-[--border-color] hover:bg-[--bg-tertiary]"
+              }`}
+            >
+              <div className="text-2xl font-bold text-[--accent-green]">{stats.resolved}</div>
+              <div className="text-xs text-[--text-muted]">Reviewed</div>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Section List */}
+      {/* Section List / Formatting Panel */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {/* AI Analysis Summary */}
-        <AnalysisSummary analysis={analysis} />
+        {activeTab === "content" ? (
+          <>
+            {/* AI Analysis Summary */}
+            <AnalysisSummary analysis={analysis} />
 
-        {filteredMatches.length === 0 ? (
-          <div className="text-center py-12">
-            <CheckCircle2 className="w-12 h-12 text-[--accent-green] mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-[--text-primary]">All Clear!</h3>
-            <p className="text-[--text-secondary]">
-              {filter === "issues"
-                ? "No more sections need review"
-                : filter === "resolved"
-                ? "No sections have been reviewed yet"
-                : "No sections found"}
-            </p>
-          </div>
+            {filteredMatches.length === 0 ? (
+              <div className="text-center py-12">
+                <CheckCircle2 className="w-12 h-12 text-[--accent-green] mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-[--text-primary]">All Clear!</h3>
+                <p className="text-[--text-secondary]">
+                  {filter === "issues"
+                    ? "No more sections need review"
+                    : filter === "resolved"
+                    ? "No sections have been reviewed yet"
+                    : "No sections found"}
+                </p>
+              </div>
+            ) : (
+              filteredMatches.map((match) => (
+                <SectionCard
+                  key={match.draftSection.id}
+                  match={match}
+                  isExpanded={expandedSections.has(match.draftSection.id)}
+                  onToggle={() => toggleSection(match.draftSection.id)}
+                  editedContent={editedSections[match.draftSection.id]}
+                  onEdit={(content) => onEdit(match.draftSection.id, content)}
+                  onMarkResolved={() => markResolved(match.draftSection.id)}
+                />
+              ))
+            )}
+          </>
         ) : (
-          filteredMatches.map((match) => (
-            <SectionCard
-              key={match.draftSection.id}
-              match={match}
-              isExpanded={expandedSections.has(match.draftSection.id)}
-              onToggle={() => toggleSection(match.draftSection.id)}
-              editedContent={editedSections[match.draftSection.id]}
-              onEdit={(content) => onEdit(match.draftSection.id, content)}
-              onMarkResolved={() => markResolved(match.draftSection.id)}
-            />
-          ))
+          <>
+            {formattingAnalysis ? (
+              <FormattingPanel
+                analysis={formattingAnalysis}
+                onApplyFix={onApplyFormatting || (() => {})}
+                onApplyAllFixes={onApplyAllFormatting || (() => {})}
+              />
+            ) : (
+              <div className="text-center py-12">
+                <Type className="w-12 h-12 text-[--text-muted] mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-[--text-primary]">Formatting Analysis Pending</h3>
+                <p className="text-[--text-secondary]">
+                  Formatting analysis is still processing or not available for these documents.
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

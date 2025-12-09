@@ -12,13 +12,15 @@
     "clsx": "^2.1.1",
     "diff": "^7.0.0",
     "docx": "^8.5.0",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.456.0",
     "mammoth": "^1.8.0",
     "next": "^15.0.0",
     "openai": "^4.67.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "xml2js": "^0.6.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",
@@ -27,6 +29,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/uuid": "^10.0.0",
+    "@types/xml2js": "^0.4.14",
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
     "eslint-config-next": "^15.0.0",

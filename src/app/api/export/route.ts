@@ -1,15 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
-import type { ParsedSOW, Section } from "@/types";
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, convertInchesToTwip } from "docx";
+import type { ParsedSOW, Section, FormattingDifference, ParagraphFormatting, TextRunFormatting } from "@/types";
 
 interface ExportRequestBody {
   sow: ParsedSOW;
   editedSections?: Record<string, string>;
+  appliedFormatting?: string[]; // IDs of formatting fixes that were applied
+  formattingFixes?: FormattingDifference[]; // The actual formatting fixes
 }
 
-function sectionToDocxParagraphs(section: Section, editedBody?: string): Paragraph[] {
+// Map alignment values to docx AlignmentType
+function mapAlignment(alignment?: string): (typeof AlignmentType)[keyof typeof AlignmentType] | undefined {
+  switch (alignment) {
+    case "left": return AlignmentType.LEFT;
+    case "center": return AlignmentType.CENTER;
+    case "right": return AlignmentType.RIGHT;
+    case "justify": return AlignmentType.JUSTIFIED;
+    default: return undefined;
+  }
+}
+
+interface FormattingOptions {
+  paragraphFormatting?: ParagraphFormatting;
+  textFormatting?: TextRunFormatting;
+}
+
+function sectionToDocxParagraphs(
+  section: Section,
+  editedBody?: string,
+  formattingOptions?: FormattingOptions
+): Paragraph[] {
   const paragraphs: Paragraph[] = [];
   const body = editedBody || section.body;
+  const pFormat = formattingOptions?.paragraphFormatting;
+  const tFormat = formattingOptions?.textFormatting;
 
   // Add section heading
   if (section.title || section.number) {
@@ -20,10 +44,13 @@ function sectionToDocxParagraphs(section: Section, editedBody?: string): Paragra
     paragraphs.push(
       new Paragraph({
         heading: headingLevel,
+        alignment: mapAlignment(pFormat?.alignment),
         children: [
           new TextRun({
             text: `${section.number ? section.number + ". " : ""}${section.title || ""}`,
             bold: true,
+            font: tFormat?.fontFamily,
+            size: tFormat?.fontSize ? tFormat.fontSize * 2 : undefined, // Convert pt to half-pt
           }),
         ],
       })
@@ -36,14 +63,26 @@ function sectionToDocxParagraphs(section: Section, editedBody?: string): Paragra
     if (para.trim()) {
       paragraphs.push(
         new Paragraph({
+          alignment: mapAlignment(pFormat?.alignment),
+          indent: pFormat?.indentLeft ? {
+            left: pFormat.indentLeft,
+            firstLine: pFormat.indentFirstLine,
+          } : undefined,
+          spacing: {
+            before: pFormat?.spacingBefore,
+            after: pFormat?.spacingAfter || 200,
+            line: pFormat?.lineSpacing,
+          },
           children: [
             new TextRun({
               text: para.trim(),
+              bold: tFormat?.bold,
+              italics: tFormat?.italic,
+              font: tFormat?.fontFamily,
+              size: tFormat?.fontSize ? tFormat.fontSize * 2 : undefined,
+              color: tFormat?.color,
             }),
           ],
-          spacing: {
-            after: 200,
-          },
         })
       );
     }
@@ -63,7 +102,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const { sow, editedSections = {} } = body;
+    const { sow, editedSections = {}, appliedFormatting = [], formattingFixes = [] } = body;
+
+    // Build a map of formatting fixes by section ID
+    const formattingBySectionId = new Map<string, FormattingOptions>();
+
+    for (const fix of formattingFixes) {
+      if (appliedFormatting.includes(fix.id) && fix.fix) {
+        const sectionId = fix.location.sectionId;
+        const existing = formattingBySectionId.get(sectionId) || {};
+
+        if (fix.fix.type === "apply_template_formatting" || fix.fix.type === "apply_template_style") {
+          existing.paragraphFormatting = {
+            ...existing.paragraphFormatting,
+            ...(fix.fix.templateFormatting as ParagraphFormatting),
+          };
+        }
+
+        if (fix.fix.type === "apply_template_font") {
+          existing.textFormatting = {
+            ...existing.textFormatting,
+            ...(fix.fix.templateFormatting as TextRunFormatting),
+          };
+        }
+
+        formattingBySectionId.set(sectionId, existing);
+      }
+    }
 
     // Build document paragraphs
     const docParagraphs: Paragraph[] = [];
@@ -132,7 +197,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Add sections
     for (const section of sow.sections) {
       const editedBody = editedSections[section.id];
-      const sectionParagraphs = sectionToDocxParagraphs(section, editedBody);
+      const formattingOptions = formattingBySectionId.get(section.id);
+      const sectionParagraphs = sectionToDocxParagraphs(section, editedBody, formattingOptions);
       docParagraphs.push(...sectionParagraphs);
     }
 

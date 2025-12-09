@@ -133,3 +133,128 @@ export interface AppState {
   selectedSectionId: string | null;
   editedSections: Record<string, string>;
 }
+
+// Rich formatting types
+export interface TextRunFormatting {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strike?: boolean;
+  fontSize?: number;
+  fontFamily?: string;
+  color?: string;
+  highlight?: string;
+}
+
+export interface ParagraphFormatting {
+  alignment?: "left" | "center" | "right" | "justify";
+  indentLeft?: number;
+  indentRight?: number;
+  indentFirstLine?: number;
+  spacingBefore?: number;
+  spacingAfter?: number;
+  lineSpacing?: number;
+  styleId?: string;
+  styleName?: string;
+  outlineLevel?: number;
+}
+
+export interface FormattingDifference {
+  id: string;
+  type: "style" | "font" | "alignment" | "spacing" | "indent" | "list" | "table" | "heading";
+  description: string;
+  templateValue: string;
+  draftValue: string;
+  severity: "high" | "medium" | "low";
+  location: {
+    sectionId: string;
+    paragraphIndex?: number;
+    textSnippet?: string;
+  };
+  fix?: {
+    type: "apply_template_style" | "apply_template_formatting" | "apply_template_font";
+    templateFormatting: ParagraphFormatting | TextRunFormatting;
+  };
+}
+
+export interface AcronymInfo {
+  acronym: string;
+  occurrences: number;
+  definedInTemplate: boolean;
+  definedInDraft: boolean;
+  suggestedDefinition?: string;
+  sectionIds: string[];
+}
+
+export interface JargonInfo {
+  term: string;
+  occurrences: number;
+  isStandard: boolean;
+  alternativesInTemplate?: string[];
+  sectionIds: string[];
+}
+
+export interface FormattingAnalysis {
+  differences: FormattingDifference[];
+  acronyms: AcronymInfo[];
+  jargon: JargonInfo[];
+  summary: {
+    totalFormattingIssues: number;
+    highPriorityIssues: number;
+    undefinedAcronyms: number;
+    nonStandardJargon: number;
+  };
+}
+
+// Extended analysis result with formatting
+export interface ExtendedAnalysisResult extends AnalysisResult {
+  formattingAnalysis?: FormattingAnalysis;
+}
+
+// Rich parsed section with formatting
+export interface RichSection extends Section {
+  paragraphs?: RichParagraph[];
+  tables?: RichTable[];
+}
+
+export interface RichParagraph {
+  id: string;
+  text: string;
+  formatting: ParagraphFormatting;
+  runs: RichTextRun[];
+  isHeading?: boolean;
+  headingLevel?: number;
+  listLevel?: number;
+  listType?: "bullet" | "number";
+}
+
+export interface RichTextRun {
+  text: string;
+  formatting: TextRunFormatting;
+}
+
+export interface RichTable {
+  id: string;
+  rows: RichTableRow[];
+  columns: number;
+  style?: string;
+}
+
+export interface RichTableRow {
+  cells: RichTableCell[];
+  height?: number;
+  isHeader?: boolean;
+}
+
+export interface RichTableCell {
+  content: RichParagraph[];
+  colSpan?: number;
+  rowSpan?: number;
+  shading?: string;
+}
+
+// Extended parsed SOW with rich formatting
+export interface RichParsedSOW extends ParsedSOW {
+  richSections?: RichSection[];
+  documentStyles?: Record<string, ParagraphFormatting>;
+}

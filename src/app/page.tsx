@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   FileText,
   Upload,
@@ -15,7 +15,7 @@ import {
   FileUp,
 } from "lucide-react";
 import ReviewDashboard from "@/components/ReviewDashboard";
-import type { ParsedSOW, AnalysisResult } from "@/types";
+import type { ParsedSOW, AnalysisResult, FormattingAnalysis } from "@/types";
 
 type AppStep = "upload" | "review";
 
@@ -123,11 +123,17 @@ export default function Home() {
   const [templateSow, setTemplateSow] = useState<ParsedSOW | null>(null);
   const [draftSow, setDraftSow] = useState<ParsedSOW | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [formattingAnalysis, setFormattingAnalysis] = useState<FormattingAnalysis | null>(null);
   const [isUploading, setIsUploading] = useState<"template" | "draft" | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editedSections, setEditedSections] = useState<Record<string, string>>({});
   const [isExporting, setIsExporting] = useState(false);
+  const [appliedFormatting, setAppliedFormatting] = useState<Set<string>>(new Set());
+
+  // Store file references for formatting analysis
+  const templateFileRef = useRef<File | null>(null);
+  const draftFileRef = useRef<File | null>(null);
 
   const uploadFile = async (file: File, type: "template" | "draft") => {
     setIsUploading(type);
@@ -150,8 +156,10 @@ export default function Home() {
 
       if (type === "template") {
         setTemplateSow(data.sow);
+        templateFileRef.current = file;
       } else {
         setDraftSow(data.sow);
+        draftFileRef.current = file;
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -167,25 +175,71 @@ export default function Home() {
     setError(null);
 
     try {
-      const response = await fetch("/api/analyze", {
+      // Run both analyses in parallel
+      const contentAnalysisPromise = fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ templateSow, newSow: draftSow }),
       });
 
-      const data = await response.json();
+      // Run formatting analysis if we have the files
+      let formattingPromise: Promise<Response> | null = null;
+      if (templateFileRef.current && draftFileRef.current) {
+        const formData = new FormData();
+        formData.append("template", templateFileRef.current);
+        formData.append("draft", draftFileRef.current);
+        formData.append("templateSections", JSON.stringify(templateSow.sections));
+        formData.append("draftSections", JSON.stringify(draftSow.sections));
 
-      if (!data.success) {
-        throw new Error(data.error || "Analysis failed");
+        formattingPromise = fetch("/api/analyze-formatting", {
+          method: "POST",
+          body: formData,
+        });
       }
 
-      setAnalysis(data.analysis);
+      // Wait for content analysis
+      const contentResponse = await contentAnalysisPromise;
+      const contentData = await contentResponse.json();
+
+      if (!contentData.success) {
+        throw new Error(contentData.error || "Analysis failed");
+      }
+
+      setAnalysis(contentData.analysis);
+
+      // Wait for formatting analysis if running
+      if (formattingPromise) {
+        try {
+          const formattingResponse = await formattingPromise;
+          const formattingData = await formattingResponse.json();
+          if (formattingData.success) {
+            setFormattingAnalysis(formattingData.analysis);
+          }
+        } catch (formattingError) {
+          console.error("Formatting analysis failed:", formattingError);
+          // Continue without formatting analysis
+        }
+      }
+
       setStep("review");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleApplyFormatting = (differenceId: string) => {
+    setAppliedFormatting((prev) => new Set([...prev, differenceId]));
+    // In a real implementation, this would modify the draft content
+  };
+
+  const handleApplyAllFormatting = () => {
+    if (!formattingAnalysis) return;
+    const allIds = formattingAnalysis.differences
+      .filter((d) => d.fix)
+      .map((d) => d.id);
+    setAppliedFormatting(new Set(allIds));
   };
 
   const handleEdit = useCallback((sectionId: string, content: string) => {
@@ -200,7 +254,12 @@ export default function Home() {
       const response = await fetch("/api/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sow: draftSow, editedSections }),
+        body: JSON.stringify({
+          sow: draftSow,
+          editedSections,
+          appliedFormatting: Array.from(appliedFormatting),
+          formattingFixes: formattingAnalysis?.differences || [],
+        }),
       });
 
       if (!response.ok) throw new Error("Export failed");
@@ -226,8 +285,12 @@ export default function Home() {
     setTemplateSow(null);
     setDraftSow(null);
     setAnalysis(null);
+    setFormattingAnalysis(null);
     setEditedSections({});
     setError(null);
+    setAppliedFormatting(new Set());
+    templateFileRef.current = null;
+    draftFileRef.current = null;
   };
 
   return (
@@ -379,8 +442,12 @@ export default function Home() {
             templateSow={templateSow}
             draftSow={draftSow}
             analysis={analysis}
+            formattingAnalysis={formattingAnalysis}
             editedSections={editedSections}
             onEdit={handleEdit}
+            onApplyFormatting={handleApplyFormatting}
+            onApplyAllFormatting={handleApplyAllFormatting}
+            appliedFormatting={appliedFormatting}
           />
         )}
       </main>
