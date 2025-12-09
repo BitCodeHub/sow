@@ -79,26 +79,30 @@ function FileUploadZone({
     );
   }
 
+  const inputId = `file-upload-${label.replace(/\s+/g, '-').toLowerCase()}`;
+
   return (
-    <div
+    <label
+      htmlFor={inputId}
       onDrop={handleDrop}
       onDragOver={(e) => {
         e.preventDefault();
         setIsDragging(true);
       }}
       onDragLeave={() => setIsDragging(false)}
-      className={`card p-8 text-center cursor-pointer transition-all ${
+      className={`card p-8 text-center cursor-pointer transition-all block relative ${
         isDragging ? "border-[--accent-blue] bg-[--accent-blue]/5" : "hover:border-[--border-light]"
       } ${isUploading ? "opacity-60 pointer-events-none" : ""}`}
     >
       <input
+        id={inputId}
         type="file"
         accept=".docx"
         onChange={handleFileSelect}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        className="sr-only"
         disabled={isUploading}
       />
-      <div className="relative">
+      <div>
         {isUploading ? (
           <Loader2 className="w-10 h-10 text-[--accent-blue] mx-auto spinner" />
         ) : (
@@ -110,7 +114,7 @@ function FileUploadZone({
           Drop DOCX file here or click to browse
         </p>
       </div>
-    </div>
+    </label>
   );
 }
 
