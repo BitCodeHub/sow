@@ -1,0 +1,318 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Dark theme colors */
+  --bg-primary: #0f1419;
+  --bg-secondary: #1a1f26;
+  --bg-tertiary: #242b33;
+  --bg-hover: #2d353f;
+
+  --text-primary: #f7f9fa;
+  --text-secondary: #8b98a5;
+  --text-muted: #6e7681;
+
+  --accent-blue: #1d9bf0;
+  --accent-green: #00ba7c;
+  --accent-yellow: #ffd93d;
+  --accent-red: #f4212e;
+  --accent-orange: #ff7a00;
+  --accent-purple: #7856ff;
+
+  --border-color: #2f3640;
+  --border-light: #3d4650;
+
+  /* Brand colors */
+  --brand-blue: #1a73e8;
+  --brand-sky: #00aad2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar for dark mode */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Status colors */
+.status-ok {
+  color: var(--accent-green);
+  background: rgba(0, 186, 124, 0.1);
+  border-color: rgba(0, 186, 124, 0.3);
+}
+
+.status-warning {
+  color: var(--accent-yellow);
+  background: rgba(255, 217, 61, 0.1);
+  border-color: rgba(255, 217, 61, 0.3);
+}
+
+.status-error {
+  color: var(--accent-red);
+  background: rgba(244, 33, 46, 0.1);
+  border-color: rgba(244, 33, 46, 0.3);
+}
+
+.status-info {
+  color: var(--accent-blue);
+  background: rgba(29, 155, 240, 0.1);
+  border-color: rgba(29, 155, 240, 0.3);
+}
+
+/* Diff highlighting */
+.diff-added {
+  background: rgba(0, 186, 124, 0.25);
+  color: #4ade80;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  border: 1px solid rgba(0, 186, 124, 0.4);
+}
+
+.diff-removed {
+  background: rgba(244, 33, 46, 0.25);
+  color: #f87171;
+  text-decoration: line-through;
+  text-decoration-color: rgba(244, 33, 46, 0.6);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(244, 33, 46, 0.3);
+  opacity: 0.85;
+}
+
+.diff-changed {
+  background: rgba(255, 217, 61, 0.2);
+  color: var(--accent-yellow);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 217, 61, 0.4);
+}
+
+/* Card styles */
+.card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.card-hover:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-light);
+}
+
+/* Button styles */
+.btn-primary {
+  background: var(--accent-blue);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background: #1a8cd8;
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+}
+
+.btn-success {
+  background: var(--accent-green);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-success:hover {
+  background: #00a86b;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Pulse animation for attention */
+@keyframes pulse-attention {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(244, 33, 46, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(244, 33, 46, 0);
+  }
+}
+
+.pulse-attention {
+  animation: pulse-attention 2s infinite;
+}
+
+/* Progress bar */
+.progress-bar {
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Section status indicator */
+.section-indicator {
+  width: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.section-indicator-ok {
+  background: var(--accent-green);
+}
+
+.section-indicator-warning {
+  background: var(--accent-yellow);
+}
+
+.section-indicator-error {
+  background: var(--accent-red);
+}
+
+.section-indicator-new {
+  background: var(--accent-purple);
+}
+
+/* Text input dark mode */
+input, textarea, select {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 10px 14px;
+  transition: border-color 0.2s;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(29, 155, 240, 0.2);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* Badge styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-high {
+  background: rgba(244, 33, 46, 0.15);
+  color: var(--accent-red);
+}
+
+.badge-medium {
+  background: rgba(255, 217, 61, 0.15);
+  color: var(--accent-yellow);
+}
+
+.badge-low {
+  background: rgba(29, 155, 240, 0.15);
+  color: var(--accent-blue);
+}
+
+/* Tooltip */
+.tooltip {
+  position: relative;
+}
+
+.tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  margin-bottom: 6px;
+}
+
+.tooltip:hover::after {
+  opacity: 1;
+}
+
+/* Focus visible for accessibility */
+:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}

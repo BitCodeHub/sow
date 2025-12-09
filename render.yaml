@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: sow-copilot
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_API_VERSION
+        value: "2024-08-01-preview"
+      - key: AZURE_OPENAI_DEPLOYMENT
+        value: "gpt-4.1"
