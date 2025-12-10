@@ -584,10 +584,14 @@ export default function ReviewDashboard({
   onApplyAllFormatting,
   appliedFormatting,
 }: ReviewDashboardProps) {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [resolvedSections, setResolvedSections] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<"all" | "issues" | "resolved">("all");
   const [activeTab, setActiveTab] = useState<"content" | "formatting">("content");
+
+  // Auto-expand all sections by default so users can see the content immediately
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
+    return new Set(draftSow.sections.map(s => s.id));
+  });
 
   // Match sections and organize data
   const sectionMatches = useMemo((): SectionMatch[] => {
