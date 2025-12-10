@@ -77,7 +77,7 @@ function detectSectionHeader(text: string): { number: string | null; title: stri
     if (match) {
       return {
         number: match[1],
-        title: match[2]?.trim() || null,
+        title: match[2]?.trim() || "Untitled",
       };
     }
   }
