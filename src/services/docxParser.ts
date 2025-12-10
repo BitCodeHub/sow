@@ -117,7 +117,13 @@ function parseParagraphAsSection(text: string, index: number): Section | null {
 
 function extractSections(text: string): Section[] {
   const sections: Section[] = [];
-  const paragraphs = text.split(/\n\n+/);
+
+  // Normalize line endings and split by paragraphs
+  // Handle both single and double newlines - treat double+ newlines as paragraph breaks
+  const normalizedText = text.replace(/\r\n/g, '\n');
+
+  // Split by one or more newlines to get paragraphs
+  const paragraphs = normalizedText.split(/\n+/).filter(p => p.trim());
 
   let currentSection: Section | null = null;
   let currentBody: string[] = [];
@@ -126,18 +132,23 @@ function extractSections(text: string): Section[] {
     const para = paragraphs[i].trim();
     if (!para) continue;
 
-    const potentialSection = parseParagraphAsSection(para, i);
+    // Only detect as a new section if paragraph looks like a section header
+    // (short text that matches section patterns)
+    const isLikelyHeader = para.length < 200;
+    const potentialSection = isLikelyHeader ? parseParagraphAsSection(para, i) : null;
 
     if (potentialSection) {
       // Save the previous section with accumulated body
       if (currentSection) {
+        // Join body paragraphs with double newlines for proper spacing
         currentSection.body = currentBody.join("\n\n");
         currentSection.endIndex = i - 1;
         sections.push(currentSection);
       }
 
       currentSection = potentialSection;
-      currentBody = [para];
+      // Don't include the header in the body - body starts empty
+      currentBody = [];
     } else if (currentSection) {
       // Add to current section body
       currentBody.push(para);

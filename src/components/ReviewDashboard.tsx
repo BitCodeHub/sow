@@ -488,11 +488,19 @@ function SectionCard({
                 )}
               </div>
               {match.templateSection ? (
-                <div className="text-sm text-[--text-secondary] leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
-                  {match.templateSection.body}
+                <div className="p-3 bg-[--bg-primary] rounded-lg border border-[--border-color] min-h-[120px] max-h-[400px] overflow-y-auto">
+                  {match.templateSection.body && match.templateSection.body.trim() ? (
+                    <div className="text-sm text-[--text-primary] leading-relaxed whitespace-pre-wrap">
+                      {match.templateSection.body}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-[--text-muted] italic text-center py-4">
+                      No content in this section
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="text-sm text-[--text-muted] italic p-4 text-center bg-[--bg-primary] rounded-lg">
+                <div className="text-sm text-[--text-muted] italic p-4 text-center bg-[--bg-primary] rounded-lg border border-[--border-color] min-h-[120px] flex items-center justify-center">
                   No matching section in template
                 </div>
               )}
@@ -536,15 +544,21 @@ function SectionCard({
                   </div>
                 </div>
               ) : (
-                <div className="max-h-64 overflow-y-auto">
-                  {match.templateSection ? (
-                    <DiffDisplay
-                      oldText={match.templateSection.body}
-                      newText={editedContent || match.draftSection.body}
-                    />
+                <div className="p-3 bg-[--bg-secondary] rounded-lg border border-[--border-color] min-h-[120px] max-h-[400px] overflow-y-auto">
+                  {(editedContent || match.draftSection.body)?.trim() ? (
+                    match.templateSection ? (
+                      <DiffDisplay
+                        oldText={match.templateSection.body}
+                        newText={editedContent || match.draftSection.body}
+                      />
+                    ) : (
+                      <div className="text-sm text-[--text-primary] leading-relaxed whitespace-pre-wrap">
+                        {editedContent || match.draftSection.body}
+                      </div>
+                    )
                   ) : (
-                    <div className="text-sm text-[--text-secondary] leading-relaxed whitespace-pre-wrap">
-                      {editedContent || match.draftSection.body}
+                    <div className="text-sm text-[--text-muted] italic text-center py-4">
+                      No content in this section
                     </div>
                   )}
                 </div>
