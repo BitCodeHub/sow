@@ -77,7 +77,11 @@ function parseParagraphAsSection(text: string, index: number): Section | null {
   const trimmed = text.trim();
   if (!trimmed || trimmed.length < 3) return null;
 
-  // Try to match against section patterns
+  // Only detect short lines as potential section headers (max 100 chars)
+  // Long paragraphs are definitely body content, not headers
+  if (trimmed.length > 100) return null;
+
+  // Try to match against numbered section patterns (most reliable)
   for (const pattern of SECTION_PATTERNS) {
     const match = trimmed.match(pattern);
     if (match) {
@@ -90,26 +94,47 @@ function parseParagraphAsSection(text: string, index: number): Section | null {
         number,
         title,
         level,
-        body: trimmed,
+        body: "", // Body will be populated separately
         startIndex: index,
       };
     }
   }
 
-  // Check if it looks like a section title (all caps or title case, short)
-  const isLikelyTitle =
-    (trimmed === trimmed.toUpperCase() && trimmed.length < 100) ||
-    COMMON_SECTION_TITLES.some(t => trimmed.toLowerCase().includes(t));
+  // Only detect as title-based section if:
+  // 1. Very short (< 60 chars) AND
+  // 2. Either all uppercase OR starts exactly with a common section title
+  if (trimmed.length < 60) {
+    const lowerTrimmed = trimmed.toLowerCase();
 
-  if (isLikelyTitle && trimmed.length < 150) {
-    return {
-      id: uuidv4(),
-      number: null,
-      title: trimmed,
-      level: 1,
-      body: trimmed,
-      startIndex: index,
-    };
+    // All uppercase titles are likely section headers
+    if (trimmed === trimmed.toUpperCase() && trimmed.length > 3) {
+      return {
+        id: uuidv4(),
+        number: null,
+        title: trimmed,
+        level: 1,
+        body: "",
+        startIndex: index,
+      };
+    }
+
+    // Check if text STARTS with a common section title (not just contains)
+    const startsWithCommonTitle = COMMON_SECTION_TITLES.some(t =>
+      lowerTrimmed === t ||
+      lowerTrimmed.startsWith(t + ":") ||
+      lowerTrimmed.startsWith(t + " ")
+    );
+
+    if (startsWithCommonTitle) {
+      return {
+        id: uuidv4(),
+        number: null,
+        title: trimmed,
+        level: 1,
+        body: "",
+        startIndex: index,
+      };
+    }
   }
 
   return null;
@@ -132,10 +157,9 @@ function extractSections(text: string): Section[] {
     const para = paragraphs[i].trim();
     if (!para) continue;
 
-    // Only detect as a new section if paragraph looks like a section header
-    // (short text that matches section patterns)
-    const isLikelyHeader = para.length < 200;
-    const potentialSection = isLikelyHeader ? parseParagraphAsSection(para, i) : null;
+    // Check if this paragraph is a section header
+    // parseParagraphAsSection has built-in length checks to avoid false positives
+    const potentialSection = parseParagraphAsSection(para, i);
 
     if (potentialSection) {
       // Save the previous section with accumulated body
