@@ -4,135 +4,100 @@ import type { Section, ParsedSOW } from "@/types";
 
 // Regex patterns for detecting section numbering
 const SECTION_PATTERNS = [
-  // 1. or 1.2 or 1.2.3
+  // 1. or 1.2 or 1.2.3 followed by title
   /^(\d+(?:\.\d+)*)\.\s+(.+)$/,
-  // I. or II. or III.
-  /^([IVXLCDM]+)\.\s+(.+)$/i,
-  // A. or B. or C.
-  /^([A-Z])\.\s+(.+)$/,
-  // (a) or (1) or (i)
-  /^\(([a-z0-9ivx]+)\)\s+(.+)$/i,
   // SECTION 1 or Section 1.2
   /^(?:SECTION|Section)\s+(\d+(?:\.\d+)*)[:\.]?\s*(.*)$/i,
   // ARTICLE I or Article 1
   /^(?:ARTICLE|Article)\s+([IVXLCDM\d]+)[:\.]?\s*(.*)$/i,
 ];
 
-// Common SOW section titles
-const COMMON_SECTION_TITLES = [
-  "scope of work",
-  "scope of services",
-  "deliverables",
-  "timeline",
-  "milestones",
-  "payment terms",
-  "pricing",
-  "fees",
-  "term and termination",
-  "termination",
-  "confidentiality",
-  "intellectual property",
-  "liability",
-  "limitation of liability",
-  "indemnification",
-  "warranty",
-  "warranties",
-  "service level agreement",
-  "sla",
-  "acceptance criteria",
-  "change management",
-  "governance",
-  "definitions",
-  "background",
-  "introduction",
-  "overview",
-  "assumptions",
-  "dependencies",
-  "exclusions",
-  "appendix",
-  "exhibit",
-  "schedule",
+// Common SOW section titles that indicate a new section
+const SECTION_TITLE_PATTERNS = [
+  /^(executive\s+summary)$/i,
+  /^(scope\s+of\s+work)$/i,
+  /^(scope\s+of\s+services)$/i,
+  /^(deliverables)$/i,
+  /^(timeline|milestones?)$/i,
+  /^(payment\s+terms?|pricing|fees?)$/i,
+  /^(terms?\s+and\s+termination|termination)$/i,
+  /^(confidentiality)$/i,
+  /^(intellectual\s+property)$/i,
+  /^(liability|limitation\s+of\s+liability)$/i,
+  /^(indemnification)$/i,
+  /^(warrant(?:y|ies))$/i,
+  /^(service\s+level\s+agreement|sla)$/i,
+  /^(acceptance\s+criteria)$/i,
+  /^(definitions?)$/i,
+  /^(background|introduction|overview)$/i,
+  /^(assumptions|dependencies|exclusions)$/i,
+  /^(appendix|exhibit|schedule)\s*[a-z0-9]*$/i,
 ];
 
 function calculateSectionLevel(number: string | null): number {
   if (!number) return 1;
-
-  // Count dots for numeric sections
   const dotCount = (number.match(/\./g) || []).length;
   if (dotCount > 0) return dotCount + 1;
-
-  // Roman numerals are usually top level
   if (/^[IVXLCDM]+$/i.test(number)) return 1;
-
-  // Single letters are usually second level
-  if (/^[A-Z]$/i.test(number)) return 2;
-
-  // Parenthetical numbers are usually third level
-  if (/^\([a-z0-9ivx]+\)$/i.test(number)) return 3;
-
   return 1;
 }
 
-function parseParagraphAsSection(text: string, index: number): Section | null {
+// Strip HTML tags and decode entities
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
+// Check if text looks like a TOC entry (ends with page number pattern)
+function isTocEntry(text: string): boolean {
+  // TOC entries often end with dots and page numbers like "Executive Summary.....6"
+  return /[.·…]{3,}\s*\d+\s*$/.test(text) || /\t+\d+\s*$/.test(text);
+}
+
+// Check if a paragraph is a section header
+function detectSectionHeader(text: string): { number: string | null; title: string } | null {
   const trimmed = text.trim();
-  if (!trimmed || trimmed.length < 3) return null;
 
-  // Only detect short lines as potential section headers (max 100 chars)
-  // Long paragraphs are definitely body content, not headers
-  if (trimmed.length > 100) return null;
+  // Skip empty, very short, or very long text
+  if (!trimmed || trimmed.length < 3 || trimmed.length > 150) return null;
 
-  // Try to match against numbered section patterns (most reliable)
+  // Skip TOC entries
+  if (isTocEntry(trimmed)) return null;
+
+  // Try numbered section patterns
   for (const pattern of SECTION_PATTERNS) {
     const match = trimmed.match(pattern);
     if (match) {
-      const number = match[1];
-      const title = match[2]?.trim() || null;
-      const level = calculateSectionLevel(number);
-
       return {
-        id: uuidv4(),
-        number,
-        title,
-        level,
-        body: "", // Body will be populated separately
-        startIndex: index,
+        number: match[1],
+        title: match[2]?.trim() || null,
       };
     }
   }
 
-  // Only detect as title-based section if:
-  // 1. Very short (< 60 chars) AND
-  // 2. Either all uppercase OR starts exactly with a common section title
+  // Try title-only patterns (must be short and match exactly)
   if (trimmed.length < 60) {
-    const lowerTrimmed = trimmed.toLowerCase();
-
-    // All uppercase titles are likely section headers
-    if (trimmed === trimmed.toUpperCase() && trimmed.length > 3) {
-      return {
-        id: uuidv4(),
-        number: null,
-        title: trimmed,
-        level: 1,
-        body: "",
-        startIndex: index,
-      };
+    for (const pattern of SECTION_TITLE_PATTERNS) {
+      if (pattern.test(trimmed)) {
+        return {
+          number: null,
+          title: trimmed,
+        };
+      }
     }
 
-    // Check if text STARTS with a common section title (not just contains)
-    const startsWithCommonTitle = COMMON_SECTION_TITLES.some(t =>
-      lowerTrimmed === t ||
-      lowerTrimmed.startsWith(t + ":") ||
-      lowerTrimmed.startsWith(t + " ")
-    );
-
-    if (startsWithCommonTitle) {
+    // All uppercase short text is likely a section header
+    if (trimmed === trimmed.toUpperCase() && trimmed.length > 3 && /[A-Z]/.test(trimmed)) {
       return {
-        id: uuidv4(),
         number: null,
         title: trimmed,
-        level: 1,
-        body: "",
-        startIndex: index,
       };
     }
   }
@@ -140,60 +105,97 @@ function parseParagraphAsSection(text: string, index: number): Section | null {
   return null;
 }
 
-function extractSections(text: string): Section[] {
+function extractSectionsFromHtml(html: string): Section[] {
   const sections: Section[] = [];
 
-  // Normalize line endings and split by paragraphs
-  // Handle both single and double newlines - treat double+ newlines as paragraph breaks
-  const normalizedText = text.replace(/\r\n/g, '\n');
+  // Extract paragraph content from HTML
+  // Match <p>, <h1>-<h6>, <li> tags and their content
+  const paragraphRegex = /<(?:p|h[1-6]|li)[^>]*>([\s\S]*?)<\/(?:p|h[1-6]|li)>/gi;
+  const paragraphs: string[] = [];
 
-  // Split by one or more newlines to get paragraphs
-  const paragraphs = normalizedText.split(/\n+/).filter(p => p.trim());
+  let match;
+  while ((match = paragraphRegex.exec(html)) !== null) {
+    const content = stripHtml(match[1]);
+    if (content) {
+      paragraphs.push(content);
+    }
+  }
+
+  // If no paragraphs found via HTML parsing, fall back to line-by-line
+  if (paragraphs.length === 0) {
+    const plainText = stripHtml(html);
+    paragraphs.push(...plainText.split(/\n+/).filter(p => p.trim()));
+  }
 
   let currentSection: Section | null = null;
   let currentBody: string[] = [];
+  let tocSectionDetected = false;
 
-  for (let i = 0; i < paragraphs.length; i++) {
-    const para = paragraphs[i].trim();
-    if (!para) continue;
+  for (const para of paragraphs) {
+    const trimmed = para.trim();
+    if (!trimmed) continue;
 
-    // Check if this paragraph is a section header
-    // parseParagraphAsSection has built-in length checks to avoid false positives
-    const potentialSection = parseParagraphAsSection(para, i);
+    // Detect and skip Table of Contents section
+    if (/^table\s+of\s+contents$/i.test(trimmed) || /^contents$/i.test(trimmed)) {
+      tocSectionDetected = true;
+      continue;
+    }
 
-    if (potentialSection) {
-      // Save the previous section with accumulated body
+    // Skip TOC entries
+    if (tocSectionDetected && isTocEntry(trimmed)) {
+      continue;
+    }
+
+    // End TOC detection when we hit a real section
+    if (tocSectionDetected && !isTocEntry(trimmed) && trimmed.length > 60) {
+      tocSectionDetected = false;
+    }
+
+    // Check if this is a section header
+    const headerInfo = detectSectionHeader(trimmed);
+
+    if (headerInfo) {
+      // End TOC detection on first real section header after TOC
+      tocSectionDetected = false;
+
+      // Save previous section
       if (currentSection) {
-        // Join body paragraphs with double newlines for proper spacing
         currentSection.body = currentBody.join("\n\n");
-        currentSection.endIndex = i - 1;
         sections.push(currentSection);
       }
 
-      currentSection = potentialSection;
-      // Don't include the header in the body - body starts empty
+      // Start new section
+      currentSection = {
+        id: uuidv4(),
+        number: headerInfo.number,
+        title: headerInfo.title,
+        level: calculateSectionLevel(headerInfo.number),
+        body: "",
+        startIndex: sections.length,
+      };
       currentBody = [];
     } else if (currentSection) {
-      // Add to current section body
-      currentBody.push(para);
+      // Add to current section body (skip if still in TOC)
+      if (!tocSectionDetected) {
+        currentBody.push(trimmed);
+      }
     } else {
-      // No current section, create a generic one
+      // No section yet, create introduction section
       currentSection = {
         id: uuidv4(),
         number: null,
         title: "Introduction",
         level: 1,
         body: "",
-        startIndex: i,
+        startIndex: 0,
       };
-      currentBody = [para];
+      currentBody = [trimmed];
     }
   }
 
   // Don't forget the last section
   if (currentSection) {
     currentSection.body = currentBody.join("\n\n");
-    currentSection.endIndex = paragraphs.length - 1;
     sections.push(currentSection);
   }
 
@@ -203,31 +205,26 @@ function extractSections(text: string): Section[] {
 function extractMetadata(text: string): ParsedSOW["metadata"] {
   const metadata: ParsedSOW["metadata"] = {};
 
-  // Try to extract title (usually first line or after "SOW" or "Statement of Work")
   const titleMatch = text.match(/(?:Statement of Work|SOW)[:\s]*(.+?)(?:\n|$)/i);
   if (titleMatch) {
     metadata.title = titleMatch[1].trim();
   }
 
-  // Extract vendor name
   const vendorMatch = text.match(/(?:Vendor|Provider|Contractor)[:\s]*(.+?)(?:\n|$)/i);
   if (vendorMatch) {
     metadata.vendor = vendorMatch[1].trim();
   }
 
-  // Extract client name
   const clientMatch = text.match(/(?:Client|Customer|Buyer)[:\s]*(.+?)(?:\n|$)/i);
   if (clientMatch) {
     metadata.client = clientMatch[1].trim();
   }
 
-  // Extract effective date
   const dateMatch = text.match(/(?:Effective Date|Start Date)[:\s]*(.+?)(?:\n|$)/i);
   if (dateMatch) {
     metadata.effectiveDate = dateMatch[1].trim();
   }
 
-  // Extract total value
   const valueMatch = text.match(/(?:Total Value|Contract Value|Total Amount)[:\s]*\$?([\d,]+(?:\.\d{2})?)/i);
   if (valueMatch) {
     metadata.totalValue = valueMatch[1].trim();
@@ -238,15 +235,25 @@ function extractMetadata(text: string): ParsedSOW["metadata"] {
 
 export async function parseDocx(buffer: Buffer, filename: string): Promise<ParsedSOW> {
   try {
-    // Extract text from DOCX using mammoth
-    const result = await mammoth.extractRawText({ buffer });
-    const rawText = result.value;
+    // Convert to HTML first for better structure preservation
+    const htmlResult = await mammoth.convertToHtml({ buffer });
+    const html = htmlResult.value;
 
-    // Parse sections from the text
-    const sections = extractSections(rawText);
+    // Also get raw text for metadata extraction
+    const textResult = await mammoth.extractRawText({ buffer });
+    const rawText = textResult.value;
 
-    // Extract metadata
+    // Parse sections from HTML
+    const sections = extractSectionsFromHtml(html);
+
+    // Extract metadata from raw text
     const metadata = extractMetadata(rawText);
+
+    // Log for debugging (remove in production)
+    console.log(`Parsed ${sections.length} sections from ${filename}`);
+    sections.forEach((s, i) => {
+      console.log(`  Section ${i + 1}: "${s.number ? s.number + '. ' : ''}${s.title}" - Body length: ${s.body.length} chars`);
+    });
 
     return {
       id: uuidv4(),
