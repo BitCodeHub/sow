@@ -23,10 +23,14 @@ import type {
   FormattingDifference,
   AcronymInfo,
   JargonInfo,
+  ParsedSOW,
+  Section,
 } from "@/types";
 
 interface FormattingPanelProps {
   analysis: FormattingAnalysis;
+  templateSow: ParsedSOW;
+  draftSow: ParsedSOW;
   onApplyFix: (differenceId: string) => void;
   onApplyAllFixes: () => void;
   isApplying?: boolean;
@@ -187,15 +191,219 @@ function JargonCard({ jargon }: { jargon: JargonInfo }) {
   );
 }
 
+// Section comparison card for side-by-side view
+function SectionComparisonCard({
+  templateSection,
+  draftSection,
+  differences,
+  onApplyFix,
+  isApplying,
+}: {
+  templateSection: Section;
+  draftSection: Section;
+  differences: FormattingDifference[];
+  onApplyFix: (id: string) => void;
+  isApplying: boolean;
+}) {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const hasDifferences = differences.length > 0;
+
+  return (
+    <div className={`card overflow-hidden ${hasDifferences ? 'border-[--accent-yellow]/30' : ''}`}>
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center justify-between p-3 cursor-pointer hover:bg-[--bg-tertiary] transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-[--text-muted]" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-[--text-muted]" />
+          )}
+          <div>
+            <h4 className="font-medium text-[--text-primary]">
+              {templateSection.number ? `${templateSection.number}. ` : ""}
+              {templateSection.title || "Untitled Section"}
+            </h4>
+          </div>
+        </div>
+        {hasDifferences && (
+          <span className="badge badge-medium text-xs">
+            {differences.length} formatting {differences.length === 1 ? 'issue' : 'issues'}
+          </span>
+        )}
+      </div>
+
+      {isExpanded && (
+        <div className="border-t border-[--border-color]">
+          {/* Side-by-side content comparison */}
+          <div className="grid grid-cols-2 gap-0 divide-x divide-[--border-color]">
+            {/* Template side */}
+            <div className="p-3">
+              <div className="text-xs font-semibold text-[--accent-green] uppercase tracking-wider mb-2 flex items-center gap-1">
+                <FileText className="w-3 h-3" />
+                Template (Reference)
+              </div>
+              <div className="p-3 bg-[--bg-primary] rounded-lg border border-[--border-color] min-h-[80px] max-h-[200px] overflow-y-auto">
+                {templateSection.body && templateSection.body.trim() ? (
+                  <div className="text-sm text-[--text-primary] leading-relaxed whitespace-pre-wrap">
+                    {templateSection.body}
+                  </div>
+                ) : (
+                  <div className="text-sm text-[--text-muted] italic text-center py-2">
+                    No content
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Draft side */}
+            <div className="p-3">
+              <div className="text-xs font-semibold text-[--accent-blue] uppercase tracking-wider mb-2 flex items-center gap-1">
+                <FileText className="w-3 h-3" />
+                Draft (Your Version)
+              </div>
+              <div className="p-3 bg-[--bg-primary] rounded-lg border border-[--border-color] min-h-[80px] max-h-[200px] overflow-y-auto">
+                {draftSection.body && draftSection.body.trim() ? (
+                  <div className="text-sm text-[--text-primary] leading-relaxed whitespace-pre-wrap">
+                    {draftSection.body}
+                  </div>
+                ) : (
+                  <div className="text-sm text-[--text-muted] italic text-center py-2">
+                    No content
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Formatting differences for this section */}
+          {hasDifferences && (
+            <div className="border-t border-[--border-color] p-3 bg-[--bg-tertiary]">
+              <h5 className="text-xs font-semibold text-[--accent-yellow] uppercase tracking-wider mb-2 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                Formatting Issues in This Section
+              </h5>
+              <div className="space-y-2">
+                {differences.map((diff) => (
+                  <div key={diff.id} className="p-2 bg-[--bg-primary] rounded-lg border border-[--border-color]">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`badge ${severityConfig[diff.severity].badge} text-xs`}>
+                            {diff.severity}
+                          </span>
+                          <span className="text-xs text-[--text-muted] capitalize">{diff.type}</span>
+                        </div>
+                        <p className="text-sm text-[--text-primary]">{diff.description}</p>
+                        <div className="flex items-center gap-4 text-xs mt-1">
+                          <div>
+                            <span className="text-[--text-muted]">Template: </span>
+                            <span className="text-[--accent-green] font-medium">{diff.templateValue}</span>
+                          </div>
+                          <div>
+                            <span className="text-[--text-muted]">Draft: </span>
+                            <span className="text-[--accent-red] font-medium">{diff.draftValue}</span>
+                          </div>
+                        </div>
+                      </div>
+                      {diff.fix && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onApplyFix(diff.id);
+                          }}
+                          disabled={isApplying}
+                          className="btn-success text-xs flex items-center gap-1 flex-shrink-0"
+                        >
+                          {isApplying ? (
+                            <Loader2 className="w-3 h-3 spinner" />
+                          ) : (
+                            <Check className="w-3 h-3" />
+                          )}
+                          Fix
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Match sections between template and draft
+function matchSections(
+  templateSections: Section[],
+  draftSections: Section[]
+): { templateSection: Section; draftSection: Section }[] {
+  const matches: { templateSection: Section; draftSection: Section }[] = [];
+
+  for (const draftSection of draftSections) {
+    let bestMatch: Section | null = null;
+    let bestScore = 0;
+
+    for (const templateSection of templateSections) {
+      let score = 0;
+
+      // Exact number match is highest priority
+      if (draftSection.number && templateSection.number) {
+        if (draftSection.number === templateSection.number) {
+          score += 100;
+        } else if (
+          draftSection.number.startsWith(templateSection.number) ||
+          templateSection.number.startsWith(draftSection.number)
+        ) {
+          score += 50;
+        }
+      }
+
+      // Title similarity
+      if (draftSection.title && templateSection.title) {
+        const draftTitle = draftSection.title.toLowerCase();
+        const templateTitle = templateSection.title.toLowerCase();
+
+        if (draftTitle === templateTitle) {
+          score += 80;
+        } else if (draftTitle.includes(templateTitle) || templateTitle.includes(draftTitle)) {
+          score += 40;
+        }
+      }
+
+      // Level match
+      if (draftSection.level === templateSection.level) {
+        score += 10;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = templateSection;
+      }
+    }
+
+    if (bestMatch) {
+      matches.push({ templateSection: bestMatch, draftSection });
+    }
+  }
+
+  return matches;
+}
+
 // Main Formatting Panel
 export default function FormattingPanel({
   analysis,
+  templateSow,
+  draftSow,
   onApplyFix,
   onApplyAllFixes,
   isApplying = false,
 }: FormattingPanelProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["formatting", "acronyms"])
+    new Set(["comparison", "formatting", "acronyms"])
   );
 
   const toggleSection = (section: string) => {
@@ -208,6 +416,17 @@ export default function FormattingPanel({
   };
 
   const { differences, acronyms, jargon, summary } = analysis;
+
+  // Match sections between template and draft
+  const sectionMatches = matchSections(templateSow.sections, draftSow.sections);
+
+  // Group differences by section ID
+  const diffsBySectionId = differences.reduce((acc, diff) => {
+    const sectionId = diff.location.sectionId;
+    if (!acc[sectionId]) acc[sectionId] = [];
+    acc[sectionId].push(diff);
+    return acc;
+  }, {} as Record<string, FormattingDifference[]>);
 
   // Group differences by type
   const diffsByType = differences.reduce((acc, diff) => {
@@ -282,6 +501,53 @@ export default function FormattingPanel({
             <div className="text-xs text-[--text-muted]">Non-standard Terms</div>
           </div>
         </div>
+      </div>
+
+      {/* Side-by-Side Content Comparison */}
+      <div className="card overflow-hidden">
+        <div
+          onClick={() => toggleSection("comparison")}
+          className="flex items-center justify-between p-4 cursor-pointer hover:bg-[--bg-tertiary] transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <FileText className="w-5 h-5 text-[--accent-green]" />
+            <div>
+              <h4 className="font-semibold text-[--text-primary]">
+                Side-by-Side Comparison
+              </h4>
+              <p className="text-sm text-[--text-secondary]">
+                Compare template and draft content section by section
+              </p>
+            </div>
+          </div>
+          {expandedSections.has("comparison") ? (
+            <ChevronDown className="w-5 h-5 text-[--text-muted]" />
+          ) : (
+            <ChevronRight className="w-5 h-5 text-[--text-muted]" />
+          )}
+        </div>
+
+        {expandedSections.has("comparison") && (
+          <div className="border-t border-[--border-color] p-4 space-y-4">
+            {sectionMatches.length > 0 ? (
+              sectionMatches.map(({ templateSection, draftSection }) => (
+                <SectionComparisonCard
+                  key={draftSection.id}
+                  templateSection={templateSection}
+                  draftSection={draftSection}
+                  differences={diffsBySectionId[draftSection.id] || []}
+                  onApplyFix={onApplyFix}
+                  isApplying={isApplying}
+                />
+              ))
+            ) : (
+              <div className="text-center py-8 text-[--text-muted]">
+                <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No matching sections found between template and draft.</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Formatting Differences Section */}

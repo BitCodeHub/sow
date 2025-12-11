@@ -885,6 +885,8 @@ export default function ReviewDashboard({
             {formattingAnalysis ? (
               <FormattingPanel
                 analysis={formattingAnalysis}
+                templateSow={templateSow}
+                draftSow={draftSow}
                 onApplyFix={onApplyFormatting || (() => {})}
                 onApplyAllFixes={onApplyAllFormatting || (() => {})}
               />
