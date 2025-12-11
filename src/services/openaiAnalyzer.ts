@@ -296,10 +296,27 @@ async function analyzeGlobal(
     };
   } catch (error) {
     console.error("Error in global analysis:", error);
+    // Provide more context about the error
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isRateLimit = errorMessage.includes("429") || errorMessage.toLowerCase().includes("rate");
+    const isTimeout = errorMessage.toLowerCase().includes("timeout") || errorMessage.includes("ETIMEDOUT");
+    const isAuth = errorMessage.includes("401") || errorMessage.includes("403") || errorMessage.toLowerCase().includes("auth");
+
+    let summary = "Unable to complete global analysis.";
+    if (isRateLimit) {
+      summary = "Global analysis skipped due to API rate limiting. Please wait a moment and try again.";
+    } else if (isTimeout) {
+      summary = "Global analysis timed out. The documents may be too large for analysis.";
+    } else if (isAuth) {
+      summary = "Global analysis failed due to authentication issues. Please check API credentials.";
+    } else {
+      summary = `Global analysis encountered an error: ${errorMessage.substring(0, 100)}`;
+    }
+
     return {
       scopeChange: "unchanged",
       criticalRedFlags: [],
-      summary: "Unable to complete global analysis due to an error.",
+      summary,
     };
   }
 }
